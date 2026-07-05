@@ -1,6 +1,8 @@
 package com.example.usertool.exception;
 
 import com.example.usertool.common.ApiResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ApiResponse<Void>> handleAppException(AppException exception) {
@@ -29,6 +33,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUncategorizedException(Exception exception) {
+        log.error("Uncategorized exception", exception);
         ApiResponse<Void> response = ApiResponse.of(
                 ErrorCode.UNCATEGORIZED_EXCEPTION.getCode(),
                 ErrorCode.UNCATEGORIZED_EXCEPTION.getMessage(),
