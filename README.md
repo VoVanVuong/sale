@@ -9,6 +9,7 @@ A small Spring Boot REST API for user management, built as a practice project.
 | Language    | Java 17                                  |
 | Framework   | Spring Boot 4.1.0 (Web MVC + Data JPA)   |
 | Database    | PostgreSQL                               |
+| Cache       | Redis (per-user auth state)              |
 | Validation  | Jakarta Bean Validation                  |
 | Security    | BCrypt password hashing (spring-security-crypto) |
 | Build       | Maven (wrapper included)                 |
@@ -21,6 +22,8 @@ com.example.usertool
 ├── config/AppConfig            PasswordEncoder (BCrypt) bean
 ├── controller/UserController   REST endpoints under /users
 ├── service/UserService         Business logic + soft delete
+├── cache/UserCache             Per-user auth-state cache abstraction
+│   └── RedisUserCache          Redis Hash impl (user:auth:{id})
 ├── repository/UserRepository   Spring Data JPA repository
 ├── entity/User                 JPA entity mapped to "users"
 ├── enums/Role                  USER, ADMIN
@@ -40,6 +43,7 @@ com.example.usertool
 ### Prerequisites
 - JDK 17 or higher (ensure `JAVA_HOME` is set)
 - A running PostgreSQL instance
+- A running Redis instance (e.g. `docker run -p 6379:6379 redis`)
 
 ### Database setup
 Create the database used by the app:
@@ -61,6 +65,20 @@ spring.datasource.password=123456
 
 Hibernate is configured with `ddl-auto=update`, so the `users` table is created
 automatically on first run.
+
+### Redis auth state
+On successful registration, the app seeds a per-user Redis Hash that will back
+future JWT validation:
+
+```
+Key:   user:auth:{id}      (Hash)
+Field: tokenVersion = 0    (bump to invalidate all of a user's tokens at once)
+Field: enabled      = true (account on/off)
+```
+
+Seeding is best-effort: if Redis is unavailable the registration still succeeds
+(the failure is logged), and Redis timeouts are kept short so a missing Redis
+never stalls the request.
 
 ### Run
 

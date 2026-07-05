@@ -1,5 +1,6 @@
 package com.example.usertool.service;
 
+import com.example.usertool.cache.UserCache;
 import com.example.usertool.dto.request.UserCreationRequest;
 import com.example.usertool.dto.request.UserUpdateRequest;
 import com.example.usertool.dto.response.UserResponse;
@@ -25,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,6 +40,9 @@ class UserServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private UserCache userCache;
 
     @InjectMocks
     private UserService userService;
@@ -75,6 +81,29 @@ class UserServiceTest {
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(saved.capture());
         assertEquals("hashed-secret", saved.getValue().getPassword());
+
+        // Auth state is seeded in Redis for the newly created user.
+        verify(userCache).initialize(2L);
+    }
+
+    @Test
+    void createUser_redisFailure_stillCreatesUser() {
+        UserCreationRequest request =
+                new UserCreationRequest("bob", "bob@example.com", "secret123");
+        when(userRepository.existsByUsername("bob")).thenReturn(false);
+        when(passwordEncoder.encode("secret123")).thenReturn("hashed-secret");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+            User u = invocation.getArgument(0);
+            u.setId(2L);
+            return u;
+        });
+        doThrow(new RuntimeException("redis down")).when(userCache).initialize(anyLong());
+
+        UserResponse response = userService.createUser(request);
+
+        // Registration succeeds despite the cache failure.
+        assertEquals(2L, response.id());
+        assertEquals("bob", response.username());
     }
 
     @Test
@@ -88,6 +117,7 @@ class UserServiceTest {
         assertEquals(ErrorCode.USER_EXISTED, ex.getErrorCode());
         verify(userRepository, never()).save(any());
         verify(passwordEncoder, never()).encode(any());
+        verify(userCache, never()).initialize(anyLong());
     }
 
     @Test

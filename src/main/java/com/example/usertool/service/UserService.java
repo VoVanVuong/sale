@@ -1,5 +1,6 @@
 package com.example.usertool.service;
 
+import com.example.usertool.cache.UserCache;
 import com.example.usertool.dto.request.UserCreationRequest;
 import com.example.usertool.dto.request.UserUpdateRequest;
 import com.example.usertool.dto.response.UserResponse;
@@ -7,6 +8,8 @@ import com.example.usertool.entity.User;
 import com.example.usertool.exception.AppException;
 import com.example.usertool.exception.ErrorCode;
 import com.example.usertool.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -15,12 +18,18 @@ import java.util.List;
 @Service
 public class UserService {
 
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UserCache userCache;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository,
+                       PasswordEncoder passwordEncoder,
+                       UserCache userCache) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.userCache = userCache;
     }
 
     public UserResponse createUser(UserCreationRequest request) {
@@ -33,7 +42,20 @@ public class UserService {
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
 
-        return toResponse(userRepository.save(user));
+        User saved = userRepository.save(user);
+        seedAuthState(saved.getId());
+
+        return toResponse(saved);
+    }
+
+    private void seedAuthState(Long userId) {
+        try {
+            userCache.initialize(userId);
+        } catch (Exception e) {
+            // Registration succeeds even if the cache is unavailable; the auth
+            // state can be re-seeded later. Do not fail the request.
+            log.error("Failed to seed Redis auth state for user {}", userId, e);
+        }
     }
 
     public List<UserResponse> getUsers() {
