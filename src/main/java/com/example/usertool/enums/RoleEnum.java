@@ -1,12 +1,12 @@
 package com.example.usertool.enums;
 
-public enum Role {
+public enum RoleEnum {
     USER("USER"),
     ADMIN("ADMIN");
 
     private final String value;
 
-    Role(String value) {
+    RoleEnum(String value) {
         this.value = value;
     }
 

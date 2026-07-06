@@ -10,6 +10,7 @@ public enum ErrorCode {
     USER_EXISTED(1004, "User already exists", HttpStatus.CONFLICT),
     UNAUTHENTICATED(1005, "Unauthenticated", HttpStatus.UNAUTHORIZED),
     UNAUTHORIZED(1006, "You do not have permission", HttpStatus.FORBIDDEN),
+    NOT_FOUND(1007, "Resource not found", HttpStatus.NOT_FOUND),
     ;
 
     private final int code;
